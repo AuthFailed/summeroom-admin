@@ -69,6 +69,32 @@ export interface Product {
 
 export type ProductDraft = Omit<Product, 'id'> & { id?: string };
 
+export type SortKey = 'name' | 'price' | 'stock' | 'sort_order' | 'created_at' | 'updated_at';
+
+export interface ListProductsParams {
+  type?: 'plant' | 'pot';
+  q?: string;
+  visibility?: 'visible' | 'hidden';
+  inStock?: boolean;
+  sort?: SortKey;
+  order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
+export interface ProductListResponse {
+  items: Product[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface UploadedImage {
+  url: string;
+  mime: string;
+  size: number;
+}
+
 export interface OrderItem {
   id: string;
   product_id: string | null;
@@ -114,8 +140,41 @@ export const api = {
 
   me: () => request<Me>('/api/admin/me'),
 
-  listProducts: () => request<Product[]>('/api/admin/products'),
+  listProducts: (params: ListProductsParams = {}) => {
+    const qs = new URLSearchParams();
+    if (params.type) qs.set('type', params.type);
+    if (params.q) qs.set('q', params.q);
+    if (params.visibility) qs.set('visibility', params.visibility);
+    if (params.inStock !== undefined) qs.set('in_stock', String(params.inStock));
+    if (params.sort) qs.set('sort', params.sort);
+    if (params.order) qs.set('order', params.order);
+    if (params.limit !== undefined) qs.set('limit', String(params.limit));
+    if (params.offset !== undefined) qs.set('offset', String(params.offset));
+    const s = qs.toString();
+    return request<ProductListResponse>(`/api/admin/products${s ? `?${s}` : ''}`);
+  },
   getProduct: (id: string) => request<Product>(`/api/admin/products/${id}`),
+  uploadImage: async (file: File): Promise<UploadedImage> => {
+    const token = getToken();
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch(`${API_BASE}/api/admin/uploads`, {
+      method: 'POST',
+      body: fd,
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) {
+      let message = `${resp.status} ${resp.statusText}`;
+      try {
+        const j = await resp.json();
+        if (typeof j.detail === 'string') message = j.detail;
+      } catch {
+        // ignore
+      }
+      throw new ApiError(resp.status, message);
+    }
+    return (await resp.json()) as UploadedImage;
+  },
   createProduct: (body: ProductDraft) =>
     request<Product>('/api/admin/products', {
       method: 'POST',
