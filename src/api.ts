@@ -1,7 +1,8 @@
 import { clearSession, getToken, saveSession, type Me } from './auth';
 
 const FALLBACK_BASE = 'http://localhost:8000';
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? FALLBACK_BASE).replace(/\/$/, '');
+const runtimeBase = (globalThis as { __APP_CONFIG__?: { apiBaseUrl?: string } }).__APP_CONFIG__?.apiBaseUrl;
+const API_BASE = (runtimeBase || import.meta.env.VITE_API_BASE_URL || FALLBACK_BASE).replace(/\/$/, '');
 
 export class ApiError extends Error {
   status: number;
